@@ -4,7 +4,7 @@
 import adsk.core, adsk.fusion, adsk.cam, time, csv, traceback, os
 
 # Options
-isUpdateUi = True         # Update UI so we can see the model move
+updateUi = True         # Update UI so we can see the model move
 secondsBeteweenSteps = .5 # Time to wait between each position
 decimalPlaces = 2         # Number of decimals used in the CSV file
 decimalSeparator = "."    # In some languages it's ','
@@ -84,7 +84,7 @@ def run(context):
                 logger.print("slideValue " + toStr(v) + " <<<<<<<<<<<<<<<<<")
                 slider.slideValue = v
 
-                if isUpdateUi:
+                if updateUi:
                     adsk.doEvents()
                     time.sleep(secondsBeteweenSteps)
 
