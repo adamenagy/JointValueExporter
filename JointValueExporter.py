@@ -7,6 +7,9 @@ import adsk.core, adsk.fusion, adsk.cam, time, csv, traceback, os
 decimalPlaces = 2         # Number of decimals used in the CSV file
 decimalSeparator = "."    # In some languages it's ','
 incrementValue = .5       # Internal length units are in cm
+updateUi = True           # Update UI so we can see the model move
+secondsBeteweenSteps = .5 # Time to wait between each position (only used if updateUi = True)
+resetSliderValue = True   # Set the value of the slider joint back to what it was
 
 # Global variables
 app = adsk.core.Application.get()
