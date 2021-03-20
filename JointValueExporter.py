@@ -4,12 +4,9 @@
 import adsk.core, adsk.fusion, adsk.cam, time, csv, traceback, os
 
 # Options
-updateUi = True           # Update UI so we can see the model move
-secondsBeteweenSteps = .5 # Time to wait between each position (only used if updateUi = True)
 decimalPlaces = 2         # Number of decimals used in the CSV file
 decimalSeparator = "."    # In some languages it's ','
 incrementValue = .5       # Internal length units are in cm
-resetSliderValue = True   # Set the value of the slider joint back to what it was
 
 # Global variables
 app = adsk.core.Application.get()
@@ -29,9 +26,9 @@ def run(context):
             return 
 
         design = adsk.fusion.Design.cast(app.activeProduct)
-        um = design.unitsManager
+        unitsManager = design.unitsManager
 
-        sliderMovement = getSliderMovement(um)
+        sliderMovement = getSliderMovement(unitsManager)
         if sliderMovement == None:
             return
 
@@ -42,7 +39,9 @@ def run(context):
         #logger = VSCodeLogger()
         #logger = FileLogger("/Users/nagyad/Documents/log.txt")
 
-        with open(filePath, 'w', newline='') as csvFile:
+        newFile = (os.path.isfile(filePath) == False)
+
+        with open(filePath, 'a', newline='') as csvFile:
             csvWriter = csv.writer(csvFile, dialect=csv.excel, delimiter=getDelimiter())
 
             # Get the slider we will be driving
@@ -74,48 +73,54 @@ def run(context):
 
             logger.print("Fetching revolute joints <<<<<<<<<<<<<<<<<")
             [joints, header] = getJointsAndHeader(legNames, revolutionJointNames)
-                  
-            # Write CSV header
-            csvWriter.writerow(header) 
 
             # Start driving the slider and collect revolution angles
-            v = startValue
+            currentValue = startValue
+
+            # Write CSV header if the file does not exists yet
+            if newFile == True:
+                logger.print("Add CSV header")
+                csvWriter.writerow(header) 
+            else:
+                # We can skip the first row of values because they must 
+                # have been added previously to the existing CSV file
+                currentValue += incrementValue
+
             while True:
-                logger.print("slideValue " + toStr(v) + " <<<<<<<<<<<<<<<<<")
-                slider.slideValue = v
+                logger.print("slideValue " + toStr(currentValue) + " <<<<<<<<<<<<<<<<<")
+                slider.slideValue = currentValue
 
                 if updateUi:
                     adsk.doEvents()
                     time.sleep(secondsBeteweenSteps)
 
-                vals = [toStr(v)]
+                values = [toStr(currentValue)]
                 for joint in joints:
-                    rev = adsk.fusion.RevoluteJointMotion.cast(joint.jointMotion)
-                    val = None
+                    revolution = adsk.fusion.RevoluteJointMotion.cast(joint.jointMotion)
                     try:
                         # Internal unit is radian, so let's convert it to degrees 
-                        val = um.convert(rev.rotationValue, "radian", "degree")
+                        value = unitsManager.convert(revolution.rotationValue, "radian", "degree")
                         # Then make it a string
-                        val = toStr(val)
+                        valueString = toStr(value)
                     except:
-                        val = "error"
+                        valueString = "error"
                     
-                    vals.append(val)
-                    logger.print(joint.name + " : " + val)
+                    values.append(valueString)
+                    logger.print(joint.name + " : " + valueString)
 
                 # Add new line to CSV    
-                csvWriter.writerow(vals) 
+                csvWriter.writerow(values) 
 
                 # Are we done?
                 if (incrementValue < 0):
-                    if (v <= endValue):
+                    if (currentValue <= endValue):
                         break
                 else:
-                    if (v >= endValue):
+                    if (currentValue >= endValue):
                         break
 
                 # Next step
-                v += incrementValue
+                currentValue += incrementValue
 
         if resetSliderValue:
             slider.slideValue = startValue
@@ -127,13 +132,13 @@ def run(context):
 
 # Helper functions
 
-def toStr(num):
-    num = round(num, decimalPlaces)
+def toStr(number):
+    number = round(number, decimalPlaces)
 
     if (decimalSeparator == "."):
-        return str(num)
+        return str(number)
 
-    return str(num).replace(".", decimalSeparator)
+    return str(number).replace(".", decimalSeparator)
 
 def getDelimiter():
     if (decimalSeparator == ","):
@@ -155,18 +160,16 @@ def getFilePath():
     else:
         return None
 
-def getSliderMovement(um):
+def getSliderMovement(unitsManager):
     try:
         result = ui.inputBox(
             "How much should the slider move? [mm]", 
             "Slider Movement", "10")
-        return um.convert(float(result[0]), "mm", "cm")
+        return unitsManager.convert(float(result[0]), "mm", "cm")
     except:
         return None
 
 def getJointsAndHeader(legs, revs):
-    logger.print("Fetching revolute joints <<<<<<<<<<<<<<<<<")
-
     design = adsk.fusion.Design.cast(app.activeProduct)
     root = design.rootComponent
 
@@ -176,13 +179,13 @@ def getJointsAndHeader(legs, revs):
         legName = leg[1]
         occ = root.occurrences.itemByName(legName)
         logger.print("  Occurrence = " + occ.name)
-        for rev in revs:
-            joint = occ.component.joints.itemByName(rev[1])
+        for revolution in revs:
+            joint = occ.component.joints.itemByName(revolution[1])
             
             jointAC = joint.createForAssemblyContext(occ)
             joints.append(jointAC)
                 
-            header.append(leg[0] + "/" + rev[0])
+            header.append(leg[0] + "/" + revolution[0])
 
             logger.print("    Joint = " + joint.name)
     
